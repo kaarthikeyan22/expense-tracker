@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
+import * as XLSX from 'xlsx';
 import { db } from '@/lib/db';
 import { cookies } from 'next/headers';
-import * as XLSX from 'xlsx';
 
 async function getUser() {
   try {
@@ -19,11 +19,11 @@ async function getUser() {
 export async function GET() {
   try {
     const user = await getUser();
-
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Fetch all data
     const expenses = await db.expense.findMany({
       where: { userId: user.id },
       include: { category: true },
@@ -36,14 +36,14 @@ export async function GET() {
     });
 
     // Calculate totals
-    const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
-    const totalSavings = savings.reduce((sum, s) => sum + s.currentAmount, 0);
-    const totalSavingsTarget = savings.reduce((sum, s) => sum + s.targetAmount, 0);
+    const totalExpenses = expenses.reduce((sum: number, exp: { amount: number }) => sum + exp.amount, 0);
+    const totalSavings = savings.reduce((sum: number, s: { currentAmount: number }) => sum + s.currentAmount, 0);
+    const totalSavingsTarget = savings.reduce((sum: number, s: { targetAmount: number }) => sum + s.targetAmount, 0);
 
     // Create workbook
     const workbook = XLSX.utils.book_new();
 
-    // Sheet 1: Summary (NEW - This shows Total Expenses & Total Savings)
+    // Sheet 1: Summary (Total Expenses & Total Savings)
     const summaryData = [
       ['EXPENSE TRACKER SUMMARY'],
       [''],
@@ -57,34 +57,60 @@ export async function GET() {
       ['Generated on', new Date().toLocaleDateString()],
     ];
     const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+    
+    // Set column widths for summary
     summarySheet['!cols'] = [{ wch: 30 }, { wch: 20 }];
     XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
 
     // Sheet 2: Expenses
-    const expensesData = expenses.map((expense) => ({
-      Date: new Date(expense.date).toLocaleDateString(),
-      Description: expense.description,
-      Category: expense.category.name,
-      Amount: expense.amount,
-    }));
-    const expensesSheet = XLSX.utils.json_to_sheet(expensesData);
+    const expensesData = [
+      ['Date', 'Description', 'Category', 'Amount'],
+      ...expenses.map((exp: { date: Date; description: string; category: { name: string }; amount: number }) => [
+        new Date(exp.date).toLocaleDateString(),
+        exp.description,
+        exp.category.name,
+        exp.amount,
+      ]),
+      [''],
+      ['TOTAL', '', '', totalExpenses],
+    ];
+    const expensesSheet = XLSX.utils.aoa_to_sheet(expensesData);
+    expensesSheet['!cols'] = [{ wch: 15 }, { wch: 30 }, { wch: 15 }, { wch: 15 }];
     XLSX.utils.book_append_sheet(workbook, expensesSheet, 'Expenses');
 
     // Sheet 3: Savings
-    const savingsData = savings.map((saving) => ({
-      Title: saving.title,
-      'Target Amount': saving.targetAmount,
-      'Current Amount': saving.currentAmount,
-      Progress: `${Math.round((saving.currentAmount / saving.targetAmount) * 100)}%`,
-      'Target Date': saving.targetDate ? new Date(saving.targetDate).toLocaleDateString() : 'Not set',
-    }));
-    const savingsSheet = XLSX.utils.json_to_sheet(savingsData);
+    const savingsData = [
+      ['Title', 'Current Amount', 'Target Amount', 'Progress %', 'Remaining', 'Target Date'],
+      ...savings.map((s: { title: string; currentAmount: number; targetAmount: number; targetDate: Date | null }) => {
+        const progress = ((s.currentAmount / s.targetAmount) * 100).toFixed(1);
+        const remaining = s.targetAmount - s.currentAmount;
+        return [
+          s.title,
+          s.currentAmount,
+          s.targetAmount,
+          progress + '%',
+          remaining,
+          s.targetDate ? new Date(s.targetDate).toLocaleDateString() : 'N/A',
+        ];
+      }),
+      [''],
+      ['TOTAL', totalSavings, totalSavingsTarget, '', '', ''],
+    ];
+    const savingsSheet = XLSX.utils.aoa_to_sheet(savingsData);
+    savingsSheet['!cols'] = [
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 15 },
+    ];
     XLSX.utils.book_append_sheet(workbook, savingsSheet, 'Savings');
 
     // Generate buffer
     const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
-    // Return as download
+    // Return as downloadable file
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

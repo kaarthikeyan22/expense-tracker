@@ -1008,7 +1008,7 @@ export default function ExpenseTracker() {
                               />
                               <span className="text-sm">{item.icon} {item.name}</span>
                             </div>
-                            <span className="text-sm font-medium">${item.value.toFixed(2)}</span>
+                            <span className="text-sm font-medium">${Number(item.value).toFixed(2)}</span>
                           </div>
                         ))}
                       </div>
@@ -1035,20 +1035,20 @@ export default function ExpenseTracker() {
                         <XAxis dataKey="month" className="text-xs" />
                         <YAxis className="text-xs" />
                         <Tooltip
-                          content={({ active, payload, label }) => {
-                            if (active && payload && payload.length) {
-                              return (
-                                <div className="rounded-lg border bg-background p-2 shadow-sm">
-                                  <div className="font-medium">{label}</div>
-                                  <div className="text-sm text-muted-foreground">
-                                    ${payload[0].value?.toFixed(2)}
-                                  </div>
-                                </div>
-                              );
-                            }
-                            return null;
-                          }}
-                        />
+  content={({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="rounded-lg border bg-background p-2 shadow-sm">
+          <div className="font-medium">{label}</div>
+          <div className="text-sm text-muted-foreground">
+            ${Number(payload[0].value).toFixed(2)}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  }}
+/>
                         <Area
                           type="monotone"
                           dataKey="amount"
@@ -1339,7 +1339,7 @@ export default function ExpenseTracker() {
                                 <div className="rounded-lg border bg-background p-2 shadow-sm">
                                   <div className="font-medium">Day {label}</div>
                                   <div className="text-sm text-muted-foreground">
-                                    ${payload[0].value?.toFixed(2)}
+                                   ${Number(payload[0].value).toFixed(2)}
                                   </div>
                                 </div>
                               );
@@ -1382,7 +1382,7 @@ export default function ExpenseTracker() {
                             <span className="text-2xl">{category.icon}</span>
                             <span className="font-medium">{category.name}</span>
                           </div>
-                          <p className="text-2xl font-bold">${category.value.toFixed(2)}</p>
+                          <p className="text-2xl font-bold">${Number(category.value).toFixed(2)}</p>
                           <p className="text-sm text-muted-foreground">{percentage}% of total</p>
                         </CardContent>
                       </Card>
